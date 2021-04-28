@@ -719,22 +719,22 @@ public class DefaultTimeBar extends View implements TimeBar {
     event.setClassName(ACCESSIBILITY_CLASS_NAME);
   }
 
-  @Override
-  public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
-    super.onInitializeAccessibilityNodeInfo(info);
-    info.setClassName(ACCESSIBILITY_CLASS_NAME);
-    info.setContentDescription(getProgressText());
-    if (duration <= 0) {
-      return;
-    }
-    if (Util.SDK_INT >= 21) {
-      info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);
-      info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD);
-    } else {
-      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
-    }
-  }
+//  @Override
+//  public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+//    super.onInitializeAccessibilityNodeInfo(info);
+//    info.setClassName(ACCESSIBILITY_CLASS_NAME);
+//    info.setContentDescription(getProgressText());
+//    if (duration <= 0) {
+//      return;
+//    }
+//    if (Util.SDK_INT >= 21) {
+//      info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);
+//      info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD);
+//    } else {
+//      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+//      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
+//    }
+//  }
 
   @Override
   public boolean performAccessibilityAction(int action, @Nullable Bundle args) {
