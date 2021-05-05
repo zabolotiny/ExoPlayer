@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.upstream;
 
+import static java.lang.Math.min;
+
 import android.net.Uri;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
@@ -29,34 +31,31 @@ import java.net.SocketException;
 /** A UDP {@link DataSource}. */
 public final class UdpDataSource extends BaseDataSource {
 
-  /**
-   * Thrown when an error is encountered when trying to read from a {@link UdpDataSource}.
-   */
+  /** Thrown when an error is encountered when trying to read from a {@link UdpDataSource}. */
   public static final class UdpDataSourceException extends IOException {
 
     public UdpDataSourceException(IOException cause) {
       super(cause);
     }
-
   }
 
-  /**
-   * The default maximum datagram packet size, in bytes.
-   */
+  /** The default maximum datagram packet size, in bytes. */
   public static final int DEFAULT_MAX_PACKET_SIZE = 2000;
 
   /** The default socket timeout, in milliseconds. */
   public static final int DEFAULT_SOCKET_TIMEOUT_MILLIS = 8 * 1000;
 
+  public static final int UDP_PORT_UNSET = -1;
+
   private final int socketTimeoutMillis;
   private final byte[] packetBuffer;
   private final DatagramPacket packet;
 
-  private @Nullable Uri uri;
-  private @Nullable DatagramSocket socket;
-  private @Nullable MulticastSocket multicastSocket;
-  private @Nullable InetAddress address;
-  private @Nullable InetSocketAddress socketAddress;
+  @Nullable private Uri uri;
+  @Nullable private DatagramSocket socket;
+  @Nullable private MulticastSocket multicastSocket;
+  @Nullable private InetAddress address;
+  @Nullable private InetSocketAddress socketAddress;
   private boolean opened;
 
   private int packetRemaining;
@@ -86,50 +85,6 @@ public final class UdpDataSource extends BaseDataSource {
     this.socketTimeoutMillis = socketTimeoutMillis;
     packetBuffer = new byte[maxPacketSize];
     packet = new DatagramPacket(packetBuffer, 0, maxPacketSize);
-  }
-
-  /**
-   * Constructs a new instance.
-   *
-   * @param listener An optional listener.
-   * @deprecated Use {@link #UdpDataSource()} and {@link #addTransferListener(TransferListener)}.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  public UdpDataSource(@Nullable TransferListener listener) {
-    this(listener, DEFAULT_MAX_PACKET_SIZE);
-  }
-
-  /**
-   * Constructs a new instance.
-   *
-   * @param listener An optional listener.
-   * @param maxPacketSize The maximum datagram packet size, in bytes.
-   * @deprecated Use {@link #UdpDataSource(int)} and {@link #addTransferListener(TransferListener)}.
-   */
-  @Deprecated
-  @SuppressWarnings("deprecation")
-  public UdpDataSource(@Nullable TransferListener listener, int maxPacketSize) {
-    this(listener, maxPacketSize, DEFAULT_SOCKET_TIMEOUT_MILLIS);
-  }
-
-  /**
-   * Constructs a new instance.
-   *
-   * @param listener An optional listener.
-   * @param maxPacketSize The maximum datagram packet size, in bytes.
-   * @param socketTimeoutMillis The socket timeout in milliseconds. A timeout of zero is interpreted
-   *     as an infinite timeout.
-   * @deprecated Use {@link #UdpDataSource(int, int)} and {@link
-   *     #addTransferListener(TransferListener)}.
-   */
-  @Deprecated
-  public UdpDataSource(
-      @Nullable TransferListener listener, int maxPacketSize, int socketTimeoutMillis) {
-    this(maxPacketSize, socketTimeoutMillis);
-    if (listener != null) {
-      addTransferListener(listener);
-    }
   }
 
   @Override
@@ -181,14 +136,15 @@ public final class UdpDataSource extends BaseDataSource {
     }
 
     int packetOffset = packet.getLength() - packetRemaining;
-    int bytesToRead = Math.min(packetRemaining, readLength);
+    int bytesToRead = min(packetRemaining, readLength);
     System.arraycopy(packetBuffer, packetOffset, buffer, offset, bytesToRead);
     packetRemaining -= bytesToRead;
     return bytesToRead;
   }
 
   @Override
-  public @Nullable Uri getUri() {
+  @Nullable
+  public Uri getUri() {
     return uri;
   }
 
@@ -216,4 +172,14 @@ public final class UdpDataSource extends BaseDataSource {
     }
   }
 
+  /**
+   * Returns the local port number opened for the UDP connection, or {@link #UDP_PORT_UNSET} if no
+   * connection is open
+   */
+  public int getLocalPort() {
+    if (socket == null) {
+      return UDP_PORT_UNSET;
+    }
+    return socket.getLocalPort();
+  }
 }

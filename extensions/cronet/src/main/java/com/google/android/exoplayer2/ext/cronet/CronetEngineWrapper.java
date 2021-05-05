@@ -15,8 +15,11 @@
  */
 package com.google.android.exoplayer2.ext.cronet;
 
+import static java.lang.Math.min;
+
 import android.content.Context;
 import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
@@ -37,8 +40,8 @@ public final class CronetEngineWrapper {
 
   private static final String TAG = "CronetEngineWrapper";
 
-  private final CronetEngine cronetEngine;
-  private final @CronetEngineSource int cronetEngineSource;
+  @Nullable private final CronetEngine cronetEngine;
+  @CronetEngineSource private final int cronetEngineSource;
 
   /**
    * Source of {@link CronetEngine}. One of {@link #SOURCE_NATIVE}, {@link #SOURCE_GMS}, {@link
@@ -70,25 +73,29 @@ public final class CronetEngineWrapper {
   public static final int SOURCE_UNAVAILABLE = 4;
 
   /**
-   * Creates a wrapper for a {@link CronetEngine} which automatically selects the most suitable
-   * {@link CronetProvider}. Sets wrapper to prefer natively bundled Cronet over GMSCore Cronet
-   * if both are available.
+   * Creates a wrapper for a {@link CronetEngine} built using the most suitable {@link
+   * CronetProvider}. When natively bundled Cronet and GMSCore Cronet are both available, the
+   * natively bundled provider is preferred.
    *
    * @param context A context.
    */
   public CronetEngineWrapper(Context context) {
-    this(context, false);
+    this(context, /* userAgent= */ null, /* preferGMSCoreCronet= */ false);
   }
 
   /**
-   * Creates a wrapper for a {@link CronetEngine} which automatically selects the most suitable
-   * {@link CronetProvider} based on user preference.
+   * Creates a wrapper for a {@link CronetEngine} built using the most suitable {@link
+   * CronetProvider}. When natively bundled Cronet and GMSCore Cronet are both available, {@code
+   * preferGMSCoreCronet} determines which is preferred.
    *
    * @param context A context.
+   * @param userAgent A default user agent, or {@code null} to use a default user agent of the
+   *     {@link CronetEngine}.
    * @param preferGMSCoreCronet Whether Cronet from GMSCore should be preferred over natively
    *     bundled Cronet if both are available.
    */
-  public CronetEngineWrapper(Context context, boolean preferGMSCoreCronet) {
+  public CronetEngineWrapper(
+      Context context, @Nullable String userAgent, boolean preferGMSCoreCronet) {
     CronetEngine cronetEngine = null;
     @CronetEngineSource int cronetEngineSource = SOURCE_UNAVAILABLE;
     List<CronetProvider> cronetProviders = new ArrayList<>(CronetProvider.getAllProviders(context));
@@ -105,7 +112,11 @@ public final class CronetEngineWrapper {
     for (int i = 0; i < cronetProviders.size() && cronetEngine == null; i++) {
       String providerName = cronetProviders.get(i).getName();
       try {
-        cronetEngine = cronetProviders.get(i).createBuilder().build();
+        CronetEngine.Builder cronetEngineBuilder = cronetProviders.get(i).createBuilder();
+        if (userAgent != null) {
+          cronetEngineBuilder.setUserAgent(userAgent);
+        }
+        cronetEngine = cronetEngineBuilder.build();
         if (providerComparator.isNativeProvider(providerName)) {
           cronetEngineSource = SOURCE_NATIVE;
         } else if (providerComparator.isGMSCoreProvider(providerName)) {
@@ -130,9 +141,9 @@ public final class CronetEngineWrapper {
   }
 
   /**
-   * Creates a wrapper for an existing CronetEngine.
+   * Creates a wrapper for an existing {@link CronetEngine}.
    *
-   * @param cronetEngine An existing CronetEngine.
+   * @param cronetEngine The CronetEngine to wrap.
    */
   public CronetEngineWrapper(CronetEngine cronetEngine) {
     this.cronetEngine = cronetEngine;
@@ -144,7 +155,8 @@ public final class CronetEngineWrapper {
    *
    * @return A {@link CronetEngineSource} value.
    */
-  public @CronetEngineSource int getCronetEngineSource() {
+  @CronetEngineSource
+  public int getCronetEngineSource() {
     return cronetEngineSource;
   }
 
@@ -153,17 +165,19 @@ public final class CronetEngineWrapper {
    *
    * @return The CronetEngine, or null if no CronetEngine is available.
    */
+  @Nullable
   /* package */ CronetEngine getCronetEngine() {
     return cronetEngine;
   }
 
   private static class CronetProviderComparator implements Comparator<CronetProvider> {
 
-    private final String gmsCoreCronetName;
+    @Nullable private final String gmsCoreCronetName;
     private final boolean preferGMSCoreCronet;
 
     // Multi-catch can only be used for API 19+ in this case.
-    @SuppressWarnings("UseMultiCatch")
+    // Field#get(null) is blocked by the null-checker, but is safe because the field is static.
+    @SuppressWarnings({"UseMultiCatch", "nullness:argument.type.incompatible"})
     public CronetProviderComparator(boolean preferGMSCoreCronet) {
       // GMSCore CronetProvider classes are only available in some configurations.
       // Thus, we use reflection to copy static name.
@@ -226,7 +240,7 @@ public final class CronetEngineWrapper {
       }
       String[] versionStringsLeft = Util.split(versionLeft, "\\.");
       String[] versionStringsRight = Util.split(versionRight, "\\.");
-      int minLength = Math.min(versionStringsLeft.length, versionStringsRight.length);
+      int minLength = min(versionStringsLeft.length, versionStringsRight.length);
       for (int i = 0; i < minLength; i++) {
         if (!versionStringsLeft[i].equals(versionStringsRight[i])) {
           try {

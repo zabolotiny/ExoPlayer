@@ -18,11 +18,15 @@ package com.google.android.exoplayer2.testutil;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.Timeline.Period;
+import com.google.android.exoplayer2.drm.DrmSessionEventListener;
+import com.google.android.exoplayer2.drm.DrmSessionManager;
+import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.MediaSourceEventListener.EventDispatcher;
+import com.google.android.exoplayer2.source.MediaSourceEventListener;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Util;
 
 /**
  * Fake {@link MediaSource} that provides a given timeline. Creating the period returns a
@@ -34,28 +38,39 @@ public class FakeAdaptiveMediaSource extends FakeMediaSource {
 
   public FakeAdaptiveMediaSource(
       Timeline timeline,
-      Object manifest,
       TrackGroupArray trackGroupArray,
       FakeChunkSource.Factory chunkSourceFactory) {
-    super(timeline, manifest, trackGroupArray);
+    super(
+        timeline,
+        DrmSessionManager.DRM_UNSUPPORTED,
+        /* trackDataFactory= */ (unusedFormat, unusedMediaPeriodId) -> {
+          throw new RuntimeException("Unused TrackDataFactory");
+        },
+        trackGroupArray);
     this.chunkSourceFactory = chunkSourceFactory;
   }
 
   @Override
-  protected FakeMediaPeriod createFakeMediaPeriod(
+  protected MediaPeriod createMediaPeriod(
       MediaPeriodId id,
       TrackGroupArray trackGroupArray,
       Allocator allocator,
-      EventDispatcher eventDispatcher,
+      MediaSourceEventListener.EventDispatcher mediaSourceEventDispatcher,
+      DrmSessionManager drmSessionManager,
+      DrmSessionEventListener.EventDispatcher drmEventDispatcher,
       @Nullable TransferListener transferListener) {
-    Period period = timeline.getPeriodByUid(id.periodUid, new Period());
+    Period period = Util.castNonNull(getTimeline()).getPeriodByUid(id.periodUid, new Period());
     return new FakeAdaptiveMediaPeriod(
         trackGroupArray,
-        eventDispatcher,
+        mediaSourceEventDispatcher,
         allocator,
         chunkSourceFactory,
         period.durationUs,
         transferListener);
   }
 
+  @Override
+  public void releaseMediaPeriod(MediaPeriod mediaPeriod) {
+    ((FakeAdaptiveMediaPeriod) mediaPeriod).release();
+  }
 }

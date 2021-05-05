@@ -17,14 +17,14 @@ package com.google.android.exoplayer2.ext.leanback;
 
 import android.content.Context;
 import android.os.Handler;
+import android.util.Pair;
+import android.view.Surface;
+import android.view.SurfaceHolder;
 import androidx.annotation.Nullable;
 import androidx.leanback.R;
 import androidx.leanback.media.PlaybackGlueHost;
 import androidx.leanback.media.PlayerAdapter;
 import androidx.leanback.media.SurfaceHolderGlueHost;
-import android.util.Pair;
-import android.view.Surface;
-import android.view.SurfaceHolder;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.DefaultControlDispatcher;
@@ -36,6 +36,7 @@ import com.google.android.exoplayer2.Player.DiscontinuityReason;
 import com.google.android.exoplayer2.Player.TimelineChangeReason;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.util.ErrorMessageProvider;
+import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoListener;
 
 /** Leanback {@code PlayerAdapter} implementation for {@link Player}. */
@@ -51,10 +52,10 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
   private final ComponentListener componentListener;
   private final int updatePeriodMs;
 
-  private @Nullable PlaybackPreparer playbackPreparer;
+  @Nullable private PlaybackPreparer playbackPreparer;
   private ControlDispatcher controlDispatcher;
-  private @Nullable ErrorMessageProvider<? super ExoPlaybackException> errorMessageProvider;
-  private @Nullable SurfaceHolderGlueHost surfaceHolderGlueHost;
+  @Nullable private ErrorMessageProvider<? super ExoPlaybackException> errorMessageProvider;
+  @Nullable private SurfaceHolderGlueHost surfaceHolderGlueHost;
   private boolean hasSurface;
   private boolean lastNotifiedPreparedState;
 
@@ -71,16 +72,21 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     this.context = context;
     this.player = player;
     this.updatePeriodMs = updatePeriodMs;
-    handler = new Handler();
+    handler = Util.createHandlerForCurrentOrMainLooper();
     componentListener = new ComponentListener();
     controlDispatcher = new DefaultControlDispatcher();
   }
 
   /**
-   * Sets the {@link PlaybackPreparer}.
-   *
-   * @param playbackPreparer The {@link PlaybackPreparer}.
+   * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} instead. The adapter calls
+   *     {@link ControlDispatcher#dispatchPrepare(Player)} instead of {@link
+   *     PlaybackPreparer#preparePlayback()}. The {@link DefaultControlDispatcher} that the adapter
+   *     uses by default, calls {@link Player#prepare()}. If you wish to customize this behaviour,
+   *     you can provide a custom implementation of {@link
+   *     ControlDispatcher#dispatchPrepare(Player)}.
    */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   public void setPlaybackPreparer(@Nullable PlaybackPreparer playbackPreparer) {
     this.playbackPreparer = playbackPreparer;
   }
@@ -166,11 +172,15 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     return player.getPlaybackState() == Player.STATE_IDLE ? -1 : player.getCurrentPosition();
   }
 
+  // Calls deprecated method to provide backwards compatibility.
+  @SuppressWarnings("deprecation")
   @Override
   public void play() {
     if (player.getPlaybackState() == Player.STATE_IDLE) {
       if (playbackPreparer != null) {
         playbackPreparer.preparePlayback();
+      } else {
+        controlDispatcher.dispatchPrepare(player);
       }
     } else if (player.getPlaybackState() == Player.STATE_ENDED) {
       controlDispatcher.dispatchSeekTo(player, player.getCurrentWindowIndex(), C.TIME_UNSET);
@@ -271,7 +281,7 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     // Player.EventListener implementation.
 
     @Override
-    public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+    public void onPlaybackStateChanged(@Player.State int playbackState) {
       notifyStateChanged();
     }
 
@@ -288,8 +298,7 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     }
 
     @Override
-    public void onTimelineChanged(
-        Timeline timeline, @Nullable Object manifest, @TimelineChangeReason int reason) {
+    public void onTimelineChanged(Timeline timeline, @TimelineChangeReason int reason) {
       Callback callback = getCallback();
       callback.onDurationChanged(LeanbackPlayerAdapter.this);
       callback.onCurrentPositionChanged(LeanbackPlayerAdapter.this);
@@ -308,7 +317,11 @@ public final class LeanbackPlayerAdapter extends PlayerAdapter implements Runnab
     @Override
     public void onVideoSizeChanged(
         int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-      getCallback().onVideoSizeChanged(LeanbackPlayerAdapter.this, width, height);
+      // There's no way to pass pixelWidthHeightRatio to leanback, so we scale the width that we
+      // pass to take it into account. This is necessary to ensure that leanback uses the correct
+      // aspect ratio when playing content with non-square pixels.
+      int scaledWidth = Math.round(width * pixelWidthHeightRatio);
+      getCallback().onVideoSizeChanged(LeanbackPlayerAdapter.this, scaledWidth, height);
     }
 
     @Override

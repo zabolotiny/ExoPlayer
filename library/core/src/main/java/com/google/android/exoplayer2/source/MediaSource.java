@@ -17,9 +17,9 @@ package com.google.android.exoplayer2.source;
 
 import android.os.Handler;
 import androidx.annotation.Nullable;
-import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.ExoPlayer;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.drm.DrmSessionEventListener;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import java.io.IOException;
@@ -31,9 +31,9 @@ import java.io.IOException;
  * <ul>
  *   <li>To provide the player with a {@link Timeline} defining the structure of its media, and to
  *       provide a new timeline whenever the structure of the media changes. The MediaSource
- *       provides these timelines by calling {@link SourceInfoRefreshListener#onSourceInfoRefreshed}
- *       on the {@link SourceInfoRefreshListener}s passed to {@link
- *       #prepareSource(SourceInfoRefreshListener, TransferListener)}.
+ *       provides these timelines by calling {@link MediaSourceCaller#onSourceInfoRefreshed} on the
+ *       {@link MediaSourceCaller}s passed to {@link #prepareSource(MediaSourceCaller,
+ *       TransferListener)}.
  *   <li>To provide {@link MediaPeriod} instances for the periods in its timeline. MediaPeriods are
  *       obtained by calling {@link #createPeriod(MediaPeriodId, Allocator, long)}, and provide a
  *       way for the player to load and read the media.
@@ -46,173 +46,66 @@ import java.io.IOException;
  */
 public interface MediaSource {
 
-  /** Listener for source events. */
-  interface SourceInfoRefreshListener {
+  /** A caller of media sources, which will be notified of source events. */
+  interface MediaSourceCaller {
 
     /**
-     * Called when manifest and/or timeline has been refreshed.
-     * <p>
-     * Called on the playback thread.
+     * Called when the {@link Timeline} has been refreshed.
+     *
+     * <p>Called on the playback thread.
      *
      * @param source The {@link MediaSource} whose info has been refreshed.
      * @param timeline The source's timeline.
-     * @param manifest The loaded manifest. May be null.
      */
-    void onSourceInfoRefreshed(MediaSource source, Timeline timeline, @Nullable Object manifest);
-
+    void onSourceInfoRefreshed(MediaSource source, Timeline timeline);
   }
 
+  // TODO(b/172315872) Delete when all clients have been migrated to base class.
   /**
    * Identifier for a {@link MediaPeriod}.
+   *
+   * <p>Extends for backward-compatibility {@link
+   * com.google.android.exoplayer2.source.MediaPeriodId}.
    */
-  final class MediaPeriodId {
+  final class MediaPeriodId extends com.google.android.exoplayer2.source.MediaPeriodId {
 
-    /** The unique id of the timeline period. */
-    public final Object periodUid;
-
-    /**
-     * If the media period is in an ad group, the index of the ad group in the period.
-     * {@link C#INDEX_UNSET} otherwise.
-     */
-    public final int adGroupIndex;
-
-    /**
-     * If the media period is in an ad group, the index of the ad in its ad group in the period.
-     * {@link C#INDEX_UNSET} otherwise.
-     */
-    public final int adIndexInAdGroup;
-
-    /**
-     * The sequence number of the window in the buffered sequence of windows this media period is
-     * part of. {@link C#INDEX_UNSET} if the media period id is not part of a buffered sequence of
-     * windows.
-     */
-    public final long windowSequenceNumber;
-
-    /**
-     * The index of the next ad group to which the media period's content is clipped, or {@link
-     * C#INDEX_UNSET} if there is no following ad group or if this media period is an ad.
-     */
-    public final int nextAdGroupIndex;
-
-    /**
-     * Creates a media period identifier for a dummy period which is not part of a buffered sequence
-     * of windows.
-     *
-     * @param periodUid The unique id of the timeline period.
-     */
+    /** See {@link com.google.android.exoplayer2.source.MediaPeriodId#MediaPeriodId(Object)}. */
     public MediaPeriodId(Object periodUid) {
-      this(periodUid, /* windowSequenceNumber= */ C.INDEX_UNSET);
+      super(periodUid);
     }
 
     /**
-     * Creates a media period identifier for the specified period in the timeline.
-     *
-     * @param periodUid The unique id of the timeline period.
-     * @param windowSequenceNumber The sequence number of the window in the buffered sequence of
-     *     windows this media period is part of.
+     * See {@link com.google.android.exoplayer2.source.MediaPeriodId#MediaPeriodId(Object, long)}.
      */
     public MediaPeriodId(Object periodUid, long windowSequenceNumber) {
-      this(
-          periodUid,
-          /* adGroupIndex= */ C.INDEX_UNSET,
-          /* adIndexInAdGroup= */ C.INDEX_UNSET,
-          windowSequenceNumber,
-          /* nextAdGroupIndex= */ C.INDEX_UNSET);
+      super(periodUid, windowSequenceNumber);
     }
 
     /**
-     * Creates a media period identifier for the specified clipped period in the timeline.
-     *
-     * @param periodUid The unique id of the timeline period.
-     * @param windowSequenceNumber The sequence number of the window in the buffered sequence of
-     *     windows this media period is part of.
-     * @param nextAdGroupIndex The index of the next ad group to which the media period's content is
-     *     clipped.
+     * See {@link com.google.android.exoplayer2.source.MediaPeriodId#MediaPeriodId(Object, long,
+     * int)}.
      */
     public MediaPeriodId(Object periodUid, long windowSequenceNumber, int nextAdGroupIndex) {
-      this(
-          periodUid,
-          /* adGroupIndex= */ C.INDEX_UNSET,
-          /* adIndexInAdGroup= */ C.INDEX_UNSET,
-          windowSequenceNumber,
-          nextAdGroupIndex);
+      super(periodUid, windowSequenceNumber, nextAdGroupIndex);
     }
 
     /**
-     * Creates a media period identifier that identifies an ad within an ad group at the specified
-     * timeline period.
-     *
-     * @param periodUid The unique id of the timeline period that contains the ad group.
-     * @param adGroupIndex The index of the ad group.
-     * @param adIndexInAdGroup The index of the ad in the ad group.
-     * @param windowSequenceNumber The sequence number of the window in the buffered sequence of
-     *     windows this media period is part of.
+     * See {@link com.google.android.exoplayer2.source.MediaPeriodId#MediaPeriodId(Object, int, int,
+     * long)}.
      */
     public MediaPeriodId(
         Object periodUid, int adGroupIndex, int adIndexInAdGroup, long windowSequenceNumber) {
-      this(
-          periodUid,
-          adGroupIndex,
-          adIndexInAdGroup,
-          windowSequenceNumber,
-          /* nextAdGroupIndex= */ C.INDEX_UNSET);
+      super(periodUid, adGroupIndex, adIndexInAdGroup, windowSequenceNumber);
     }
 
-    private MediaPeriodId(
-        Object periodUid,
-        int adGroupIndex,
-        int adIndexInAdGroup,
-        long windowSequenceNumber,
-        int nextAdGroupIndex) {
-      this.periodUid = periodUid;
-      this.adGroupIndex = adGroupIndex;
-      this.adIndexInAdGroup = adIndexInAdGroup;
-      this.windowSequenceNumber = windowSequenceNumber;
-      this.nextAdGroupIndex = nextAdGroupIndex;
+    /** Wraps an {@link com.google.android.exoplayer2.source.MediaPeriodId} into a MediaPeriodId. */
+    public MediaPeriodId(com.google.android.exoplayer2.source.MediaPeriodId mediaPeriodId) {
+      super(mediaPeriodId);
     }
 
-    /** Returns a copy of this period identifier but with {@code newPeriodUid} as its period uid. */
+    /** See {@link com.google.android.exoplayer2.source.MediaPeriodId#copyWithPeriodUid(Object)}. */
     public MediaPeriodId copyWithPeriodUid(Object newPeriodUid) {
-      return periodUid.equals(newPeriodUid)
-          ? this
-          : new MediaPeriodId(
-              newPeriodUid, adGroupIndex, adIndexInAdGroup, windowSequenceNumber, nextAdGroupIndex);
-    }
-
-    /**
-     * Returns whether this period identifier identifies an ad in an ad group in a period.
-     */
-    public boolean isAd() {
-      return adGroupIndex != C.INDEX_UNSET;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object obj) {
-      if (this == obj) {
-        return true;
-      }
-      if (obj == null || getClass() != obj.getClass()) {
-        return false;
-      }
-
-      MediaPeriodId periodId = (MediaPeriodId) obj;
-      return periodUid.equals(periodId.periodUid)
-          && adGroupIndex == periodId.adGroupIndex
-          && adIndexInAdGroup == periodId.adIndexInAdGroup
-          && windowSequenceNumber == periodId.windowSequenceNumber
-          && nextAdGroupIndex == periodId.nextAdGroupIndex;
-    }
-
-    @Override
-    public int hashCode() {
-      int result = 17;
-      result = 31 * result + periodUid.hashCode();
-      result = 31 * result + adGroupIndex;
-      result = 31 * result + adIndexInAdGroup;
-      result = 31 * result + (int) windowSequenceNumber;
-      result = 31 * result + nextAdGroupIndex;
-      return result;
+      return new MediaPeriodId(super.copyWithPeriodUid(newPeriodUid));
     }
   }
 
@@ -233,44 +126,108 @@ public interface MediaSource {
    */
   void removeEventListener(MediaSourceEventListener eventListener);
 
-  /** Returns the tag set on the media source, or null if none was set. */
+  /**
+   * Adds a {@link DrmSessionEventListener} to the list of listeners which are notified of DRM
+   * events for this media source.
+   *
+   * @param handler A handler on the which listener events will be posted.
+   * @param eventListener The listener to be added.
+   */
+  void addDrmEventListener(Handler handler, DrmSessionEventListener eventListener);
+
+  /**
+   * Removes a {@link DrmSessionEventListener} from the list of listeners which are notified of DRM
+   * events for this media source.
+   *
+   * @param eventListener The listener to be removed.
+   */
+  void removeDrmEventListener(DrmSessionEventListener eventListener);
+
+  /**
+   * Returns the initial placeholder timeline that is returned immediately when the real timeline is
+   * not yet known, or null to let the player create an initial timeline.
+   *
+   * <p>The initial timeline must use the same uids for windows and periods that the real timeline
+   * will use. It also must provide windows which are marked as dynamic to indicate that the window
+   * is expected to change when the real timeline arrives.
+   *
+   * <p>Any media source which has multiple windows should typically provide such an initial
+   * timeline to make sure the player reports the correct number of windows immediately.
+   */
+  @Nullable
+  default Timeline getInitialTimeline() {
+    return null;
+  }
+
+  /**
+   * Returns true if the media source is guaranteed to never have zero or more than one window.
+   *
+   * <p>The default implementation returns {@code true}.
+   *
+   * @return true if the source has exactly one window.
+   */
+  default boolean isSingleWindow() {
+    return true;
+  }
+
+  /**
+   * @deprecated Use {@link #getMediaItem()} and {@link MediaItem.PlaybackProperties#tag} instead.
+   */
+  @Deprecated
   @Nullable
   default Object getTag() {
     return null;
   }
 
+  /** Returns the {@link MediaItem} whose media is provided by the source. */
+  MediaItem getMediaItem();
+
   /**
-   * Starts source preparation if not yet started, and adds a listener for timeline and/or manifest
-   * updates.
+   * Registers a {@link MediaSourceCaller}. Starts source preparation if needed and enables the
+   * source for the creation of {@link MediaPeriod MediaPerods}.
    *
    * <p>Should not be called directly from application code.
    *
-   * <p>The listener will be also be notified if the source already has a timeline and/or manifest.
+   * <p>{@link MediaSourceCaller#onSourceInfoRefreshed(MediaSource, Timeline)} will be called once
+   * the source has a {@link Timeline}.
    *
-   * <p>For each call to this method, a call to {@link #releaseSource(SourceInfoRefreshListener)} is
-   * needed to remove the listener and to release the source if no longer required.
+   * <p>For each call to this method, a call to {@link #releaseSource(MediaSourceCaller)} is needed
+   * to remove the caller and to release the source if no longer required.
    *
-   * @param listener The listener to be added.
+   * @param caller The {@link MediaSourceCaller} to be registered.
    * @param mediaTransferListener The transfer listener which should be informed of any media data
    *     transfers. May be null if no listener is available. Note that this listener should be only
    *     informed of transfers related to the media loads and not of auxiliary loads for manifests
    *     and other data.
    */
-  void prepareSource(
-      SourceInfoRefreshListener listener, @Nullable TransferListener mediaTransferListener);
+  void prepareSource(MediaSourceCaller caller, @Nullable TransferListener mediaTransferListener);
 
   /**
    * Throws any pending error encountered while loading or refreshing source information.
-   * <p>
-   * Should not be called directly from application code.
+   *
+   * <p>Should not be called directly from application code.
+   *
+   * <p>Must only be called after {@link #prepareSource(MediaSourceCaller, TransferListener)}.
    */
   void maybeThrowSourceInfoRefreshError() throws IOException;
 
   /**
-   * Returns a new {@link MediaPeriod} identified by {@code periodId}. This method may be called
-   * multiple times without an intervening call to {@link #releasePeriod(MediaPeriod)}.
+   * Enables the source for the creation of {@link MediaPeriod MediaPeriods}.
    *
    * <p>Should not be called directly from application code.
+   *
+   * <p>Must only be called after {@link #prepareSource(MediaSourceCaller, TransferListener)}.
+   *
+   * @param caller The {@link MediaSourceCaller} enabling the source.
+   */
+  void enable(MediaSourceCaller caller);
+
+  /**
+   * Returns a new {@link MediaPeriod} identified by {@code periodId}.
+   *
+   * <p>Should not be called directly from application code.
+   *
+   * <p>Must only be called if the source is enabled.
    *
    * @param id The identifier of the period.
    * @param allocator An {@link Allocator} from which to obtain media buffer allocations.
@@ -281,20 +238,36 @@ public interface MediaSource {
 
   /**
    * Releases the period.
-   * <p>
-   * Should not be called directly from application code.
+   *
+   * <p>Should not be called directly from application code.
    *
    * @param mediaPeriod The period to release.
    */
   void releasePeriod(MediaPeriod mediaPeriod);
 
   /**
-   * Removes a listener for timeline and/or manifest updates and releases the source if no longer
-   * required.
+   * Disables the source for the creation of {@link MediaPeriod MediaPeriods}. The implementation
+   * should not hold onto limited resources used for the creation of media periods.
    *
    * <p>Should not be called directly from application code.
    *
-   * @param listener The listener to be removed.
+   * <p>Must only be called after all {@link MediaPeriod MediaPeriods} previously created by {@link
+   * #createPeriod(MediaPeriodId, Allocator, long)} have been released by {@link
+   * #releasePeriod(MediaPeriod)}.
+   *
+   * @param caller The {@link MediaSourceCaller} disabling the source.
    */
-  void releaseSource(SourceInfoRefreshListener listener);
+  void disable(MediaSourceCaller caller);
+
+  /**
+   * Unregisters a caller, and disables and releases the source if no longer required.
+   *
+   * <p>Should not be called directly from application code.
+   *
+   * <p>Must only be called if all created {@link MediaPeriod MediaPeriods} have been released by
+   * {@link #releasePeriod(MediaPeriod)}.
+   *
+   * @param caller The {@link MediaSourceCaller} to be unregistered.
+   */
+  void releaseSource(MediaSourceCaller caller);
 }

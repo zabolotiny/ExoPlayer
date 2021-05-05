@@ -15,12 +15,20 @@
  */
 package com.google.android.exoplayer2.trackselection;
 
+import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+
+import android.content.Context;
+import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.view.accessibility.CaptioningManager;
 import androidx.annotation.Nullable;
-import android.text.TextUtils;
+import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.util.Util;
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.Locale;
 
 /** Constraint parameters for track selection. */
 public class TrackSelectionParameters implements Parcelable {
@@ -31,17 +39,36 @@ public class TrackSelectionParameters implements Parcelable {
    */
   public static class Builder {
 
-    // Audio
-    @Nullable /* package */ String preferredAudioLanguage;
-    // Text
-    @Nullable /* package */ String preferredTextLanguage;
+    /* package */ ImmutableList<String> preferredAudioLanguages;
+    @C.RoleFlags /* package */ int preferredAudioRoleFlags;
+    /* package */ ImmutableList<String> preferredTextLanguages;
     @C.RoleFlags /* package */ int preferredTextRoleFlags;
     /* package */ boolean selectUndeterminedTextLanguage;
     @C.SelectionFlags /* package */ int disabledTextTrackSelectionFlags;
 
-    /** Creates a builder with default initial values. */
+    /**
+     * Creates a builder with default initial values.
+     *
+     * @param context Any context.
+     */
+    @SuppressWarnings({"deprecation", "nullness:method.invocation.invalid"})
+    public Builder(Context context) {
+      this();
+      setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(context);
+    }
+
+    /**
+     * @deprecated {@link Context} constraints will not be set when using this constructor. Use
+     *     {@link #Builder(Context)} instead.
+     */
+    @Deprecated
     public Builder() {
-      this(DEFAULT);
+      preferredAudioLanguages = ImmutableList.of();
+      preferredAudioRoleFlags = 0;
+      preferredTextLanguages = ImmutableList.of();
+      preferredTextRoleFlags = 0;
+      selectUndeterminedTextLanguage = false;
+      disabledTextTrackSelectionFlags = 0;
     }
 
     /**
@@ -49,10 +76,9 @@ public class TrackSelectionParameters implements Parcelable {
      *     the builder are obtained.
      */
     /* package */ Builder(TrackSelectionParameters initialValues) {
-      // Audio
-      preferredAudioLanguage = initialValues.preferredAudioLanguage;
-      // Text
-      preferredTextLanguage = initialValues.preferredTextLanguage;
+      preferredAudioLanguages = initialValues.preferredAudioLanguages;
+      preferredAudioRoleFlags = initialValues.preferredAudioRoleFlags;
+      preferredTextLanguages = initialValues.preferredTextLanguages;
       preferredTextRoleFlags = initialValues.preferredTextRoleFlags;
       selectUndeterminedTextLanguage = initialValues.selectUndeterminedTextLanguage;
       disabledTextTrackSelectionFlags = initialValues.disabledTextTrackSelectionFlags;
@@ -66,11 +92,55 @@ public class TrackSelectionParameters implements Parcelable {
      * @return This builder.
      */
     public Builder setPreferredAudioLanguage(@Nullable String preferredAudioLanguage) {
-      this.preferredAudioLanguage = preferredAudioLanguage;
+      return preferredAudioLanguage == null
+          ? setPreferredAudioLanguages()
+          : setPreferredAudioLanguages(preferredAudioLanguage);
+    }
+
+    /**
+     * Sets the preferred languages for audio and forced text tracks.
+     *
+     * @param preferredAudioLanguages Preferred audio languages as IETF BCP 47 conformant tags in
+     *     order of preference, or an empty array to select the default track, or the first track if
+     *     there's no default.
+     * @return This builder.
+     */
+    public Builder setPreferredAudioLanguages(String... preferredAudioLanguages) {
+      ImmutableList.Builder<String> listBuilder = ImmutableList.builder();
+      for (String language : checkNotNull(preferredAudioLanguages)) {
+        listBuilder.add(Util.normalizeLanguageCode(checkNotNull(language)));
+      }
+      this.preferredAudioLanguages = listBuilder.build();
       return this;
     }
 
-    // Text
+    /**
+     * Sets the preferred {@link C.RoleFlags} for audio tracks.
+     *
+     * @param preferredAudioRoleFlags Preferred audio role flags.
+     * @return This builder.
+     */
+    public Builder setPreferredAudioRoleFlags(@C.RoleFlags int preferredAudioRoleFlags) {
+      this.preferredAudioRoleFlags = preferredAudioRoleFlags;
+      return this;
+    }
+
+    /**
+     * Sets the preferred language and role flags for text tracks based on the accessibility
+     * settings of {@link CaptioningManager}.
+     *
+     * <p>Does nothing for API levels &lt; 19 or when the {@link CaptioningManager} is disabled.
+     *
+     * @param context A {@link Context}.
+     * @return This builder.
+     */
+    public Builder setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(
+        Context context) {
+      if (Util.SDK_INT >= 19) {
+        setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettingsV19(context);
+      }
+      return this;
+    }
 
     /**
      * Sets the preferred language for text tracks.
@@ -80,7 +150,25 @@ public class TrackSelectionParameters implements Parcelable {
      * @return This builder.
      */
     public Builder setPreferredTextLanguage(@Nullable String preferredTextLanguage) {
-      this.preferredTextLanguage = preferredTextLanguage;
+      return preferredTextLanguage == null
+          ? setPreferredTextLanguages()
+          : setPreferredTextLanguages(preferredTextLanguage);
+    }
+
+    /**
+     * Sets the preferred languages for text tracks.
+     *
+     * @param preferredTextLanguages Preferred text languages as IETF BCP 47 conformant tags in
+     *     order of preference, or an empty array to select the default track if there is one, or no
+     *     track otherwise.
+     * @return This builder.
+     */
+    public Builder setPreferredTextLanguages(String... preferredTextLanguages) {
+      ImmutableList.Builder<String> listBuilder = ImmutableList.builder();
+      for (String language : checkNotNull(preferredTextLanguages)) {
+        listBuilder.add(Util.normalizeLanguageCode(checkNotNull(language)));
+      }
+      this.preferredTextLanguages = listBuilder.build();
       return this;
     }
 
@@ -97,8 +185,8 @@ public class TrackSelectionParameters implements Parcelable {
 
     /**
      * Sets whether a text track with undetermined language should be selected if no track with
-     * {@link #setPreferredTextLanguage(String)} is available, or if the preferred language is
-     * unset.
+     * {@link #setPreferredTextLanguages(String...) a preferred language} is available, or if the
+     * preferred language is unset.
      *
      * @param selectUndeterminedTextLanguage Whether a text track with undetermined language should
      *     be selected if no preferred language track is available.
@@ -126,38 +214,91 @@ public class TrackSelectionParameters implements Parcelable {
     public TrackSelectionParameters build() {
       return new TrackSelectionParameters(
           // Audio
-          preferredAudioLanguage,
+          preferredAudioLanguages,
+          preferredAudioRoleFlags,
           // Text
-          preferredTextLanguage,
+          preferredTextLanguages,
           preferredTextRoleFlags,
           selectUndeterminedTextLanguage,
           disabledTextTrackSelectionFlags);
     }
+
+    @RequiresApi(19)
+    private void setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettingsV19(
+        Context context) {
+      if (Util.SDK_INT < 23 && Looper.myLooper() == null) {
+        // Android platform bug (pre-Marshmallow) that causes RuntimeExceptions when
+        // CaptioningService is instantiated from a non-Looper thread. See [internal: b/143779904].
+        return;
+      }
+      CaptioningManager captioningManager =
+          (CaptioningManager) context.getSystemService(Context.CAPTIONING_SERVICE);
+      if (captioningManager == null || !captioningManager.isEnabled()) {
+        return;
+      }
+      preferredTextRoleFlags = C.ROLE_FLAG_CAPTION | C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND;
+      Locale preferredLocale = captioningManager.getLocale();
+      if (preferredLocale != null) {
+        preferredTextLanguages = ImmutableList.of(Util.getLocaleLanguageTag(preferredLocale));
+      }
+    }
   }
 
-  /** An instance with default values. */
-  public static final TrackSelectionParameters DEFAULT = new TrackSelectionParameters();
+  /**
+   * An instance with default values, except those obtained from the {@link Context}.
+   *
+   * <p>If possible, use {@link #getDefaults(Context)} instead.
+   *
+   * <p>This instance will not have the following settings:
+   *
+   * <ul>
+   *   <li>{@link Builder#setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(Context)
+   *       Preferred text language and role flags} configured to the accessibility settings of
+   *       {@link CaptioningManager}.
+   * </ul>
+   */
+  @SuppressWarnings("deprecation")
+  public static final TrackSelectionParameters DEFAULT_WITHOUT_CONTEXT = new Builder().build();
 
   /**
-   * The preferred language for audio and forced text tracks, as an ISO 639-2/T tag. {@code null}
-   * selects the default track, or the first track if there's no default. The default value is
-   * {@code null}.
+   * @deprecated This instance is not configured using {@link Context} constraints. Use {@link
+   *     #getDefaults(Context)} instead.
    */
-  @Nullable public final String preferredAudioLanguage;
-  // Text
+  @Deprecated public static final TrackSelectionParameters DEFAULT = DEFAULT_WITHOUT_CONTEXT;
+
+  /** Returns an instance configured with default values. */
+  public static TrackSelectionParameters getDefaults(Context context) {
+    return new Builder(context).build();
+  }
+
   /**
-   * The preferred language for text tracks as an ISO 639-2/T tag. {@code null} selects the default
-   * track if there is one, or no track otherwise. The default value is {@code null}.
+   * The preferred languages for audio and forced text tracks as IETF BCP 47 conformant tags in
+   * order of preference. An empty list selects the default track, or the first track if there's no
+   * default. The default value is an empty list.
    */
-  @Nullable public final String preferredTextLanguage;
+  public final ImmutableList<String> preferredAudioLanguages;
+  /**
+   * The preferred {@link C.RoleFlags} for audio tracks. {@code 0} selects the default track if
+   * there is one, or the first track if there's no default. The default value is {@code 0}.
+   */
+  @C.RoleFlags public final int preferredAudioRoleFlags;
+  /**
+   * The preferred languages for text tracks as IETF BCP 47 conformant tags in order of preference.
+   * An empty list selects the default track if there is one, or no track otherwise. The default
+   * value is an empty list, or the language of the accessibility {@link CaptioningManager} if
+   * enabled.
+   */
+  public final ImmutableList<String> preferredTextLanguages;
   /**
    * The preferred {@link C.RoleFlags} for text tracks. {@code 0} selects the default track if there
-   * is one, or no track otherwise. The default value is {@code 0}.
+   * is one, or no track otherwise. The default value is {@code 0}, or {@link C#ROLE_FLAG_SUBTITLE}
+   * | {@link C#ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND} if the accessibility {@link CaptioningManager}
+   * is enabled.
    */
   @C.RoleFlags public final int preferredTextRoleFlags;
   /**
    * Whether a text track with undetermined language should be selected if no track with {@link
-   * #preferredTextLanguage} is available, or if {@link #preferredTextLanguage} is unset. The
+   * #preferredTextLanguages} is available, or if {@link #preferredTextLanguages} is unset. The
    * default value is {@code false}.
    */
   public final boolean selectUndeterminedTextLanguage;
@@ -167,36 +308,31 @@ public class TrackSelectionParameters implements Parcelable {
    */
   @C.SelectionFlags public final int disabledTextTrackSelectionFlags;
 
-  /* package */ TrackSelectionParameters() {
-    this(
-        /* preferredAudioLanguage= */ null,
-        // Text
-        /* preferredTextLanguage= */ null,
-        /* preferredTextRoleFlags= */ 0,
-        /* selectUndeterminedTextLanguage= */ false,
-        /* disabledTextTrackSelectionFlags= */ 0);
-  }
-
   /* package */ TrackSelectionParameters(
-      @Nullable String preferredAudioLanguage,
-      @Nullable String preferredTextLanguage,
+      ImmutableList<String> preferredAudioLanguages,
+      @C.RoleFlags int preferredAudioRoleFlags,
+      ImmutableList<String> preferredTextLanguages,
       @C.RoleFlags int preferredTextRoleFlags,
       boolean selectUndeterminedTextLanguage,
       @C.SelectionFlags int disabledTextTrackSelectionFlags) {
     // Audio
-    this.preferredAudioLanguage = Util.normalizeLanguageCode(preferredAudioLanguage);
+    this.preferredAudioLanguages = preferredAudioLanguages;
+    this.preferredAudioRoleFlags = preferredAudioRoleFlags;
     // Text
-    this.preferredTextLanguage = Util.normalizeLanguageCode(preferredTextLanguage);
+    this.preferredTextLanguages = preferredTextLanguages;
     this.preferredTextRoleFlags = preferredTextRoleFlags;
     this.selectUndeterminedTextLanguage = selectUndeterminedTextLanguage;
     this.disabledTextTrackSelectionFlags = disabledTextTrackSelectionFlags;
   }
 
   /* package */ TrackSelectionParameters(Parcel in) {
-    // Audio
-    this.preferredAudioLanguage = in.readString();
-    // Text
-    this.preferredTextLanguage = in.readString();
+    ArrayList<String> preferredAudioLanguages = new ArrayList<>();
+    in.readList(preferredAudioLanguages, /* loader= */ null);
+    this.preferredAudioLanguages = ImmutableList.copyOf(preferredAudioLanguages);
+    this.preferredAudioRoleFlags = in.readInt();
+    ArrayList<String> preferredTextLanguages = new ArrayList<>();
+    in.readList(preferredTextLanguages, /* loader= */ null);
+    this.preferredTextLanguages = ImmutableList.copyOf(preferredTextLanguages);
     this.preferredTextRoleFlags = in.readInt();
     this.selectUndeterminedTextLanguage = Util.readBoolean(in);
     this.disabledTextTrackSelectionFlags = in.readInt();
@@ -217,9 +353,9 @@ public class TrackSelectionParameters implements Parcelable {
       return false;
     }
     TrackSelectionParameters other = (TrackSelectionParameters) obj;
-    return TextUtils.equals(preferredAudioLanguage, other.preferredAudioLanguage)
-        // Text
-        && TextUtils.equals(preferredTextLanguage, other.preferredTextLanguage)
+    return preferredAudioLanguages.equals(other.preferredAudioLanguages)
+        && preferredAudioRoleFlags == other.preferredAudioRoleFlags
+        && preferredTextLanguages.equals(other.preferredTextLanguages)
         && preferredTextRoleFlags == other.preferredTextRoleFlags
         && selectUndeterminedTextLanguage == other.selectUndeterminedTextLanguage
         && disabledTextTrackSelectionFlags == other.disabledTextTrackSelectionFlags;
@@ -228,10 +364,9 @@ public class TrackSelectionParameters implements Parcelable {
   @Override
   public int hashCode() {
     int result = 1;
-    // Audio
-    result = 31 * result + (preferredAudioLanguage == null ? 0 : preferredAudioLanguage.hashCode());
-    // Text
-    result = 31 * result + (preferredTextLanguage == null ? 0 : preferredTextLanguage.hashCode());
+    result = 31 * result + preferredAudioLanguages.hashCode();
+    result = 31 * result + preferredAudioRoleFlags;
+    result = 31 * result + preferredTextLanguages.hashCode();
     result = 31 * result + preferredTextRoleFlags;
     result = 31 * result + (selectUndeterminedTextLanguage ? 1 : 0);
     result = 31 * result + disabledTextTrackSelectionFlags;
@@ -247,10 +382,9 @@ public class TrackSelectionParameters implements Parcelable {
 
   @Override
   public void writeToParcel(Parcel dest, int flags) {
-    // Audio
-    dest.writeString(preferredAudioLanguage);
-    // Text
-    dest.writeString(preferredTextLanguage);
+    dest.writeList(preferredAudioLanguages);
+    dest.writeInt(preferredAudioRoleFlags);
+    dest.writeList(preferredTextLanguages);
     dest.writeInt(preferredTextRoleFlags);
     Util.writeBoolean(dest, selectUndeterminedTextLanguage);
     dest.writeInt(disabledTextTrackSelectionFlags);
