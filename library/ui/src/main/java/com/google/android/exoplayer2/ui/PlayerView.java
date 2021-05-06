@@ -327,6 +327,8 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   private final FrameLayout adOverlayFrameLayout;
   @Nullable
   private final FrameLayout overlayFrameLayout;
+  @Nullable
+  private final View contentDescriptionView;
 
   @Nullable
   private Player player;
@@ -377,6 +379,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
       errorMessageView = null;
       controller = null;
       adOverlayFrameLayout = null;
+      contentDescriptionView = null;
       overlayFrameLayout = null;
       ImageView logo = new ImageView(context);
       if (Util.SDK_INT >= 23) {
@@ -434,7 +437,13 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
     LayoutInflater.from(context).inflate(playerLayoutId, this);
     setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
-    setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+    contentDescriptionView = findViewById(R.id.content_description_area);
+
+    if (contentDescriptionView != null) {
+      setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    } else {
+      setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+    }
     setContentDescription(context.getString(R.string.content_description_video));
 
     // Content frame.
@@ -537,6 +546,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     updateContentDescription();
     if (controller != null) {
       controller.addVisibilityListener(/* listener= */ componentListener);
+      setAccessibilityDelegate();
     }
   }
 
@@ -1716,23 +1726,19 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  @Override
-  public void addView(View child, int index, ViewGroup.LayoutParams params) {
-    super.addView(child, index, params);
-    setAccessibilityDelegate();
-  }
-
   private void setAccessibilityDelegate() {
-    if (controller==null)
+    if (controller == null) {
       return;
+    }
     setAccessibilityDelegate(controller);
   }
 
-  private final AccessibilityDelegateCompat accessibilityDelegateCompat = new AccessibilityDelegateCompat(){
+  private final AccessibilityDelegateCompat accessibilityDelegateCompat = new AccessibilityDelegateCompat() {
     @Override
     public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
       super.onInitializeAccessibilityEvent(host, event);
-      if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SELECTED || event.getEventType() == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED){
+      if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SELECTED
+          || event.getEventType() == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED) {
         showController();
       }
     }
@@ -1748,8 +1754,38 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  public void setContentDescriptionProvider(@NonNull  ContentDescriptionProvider contentDescriptionProvider){
-    if (controller!=null)
+  public void setContentDescriptionProvider(
+      @NonNull ContentDescriptionProvider contentDescriptionProvider) {
+    if (controller != null) {
       controller.setContentDescriptionProvider(contentDescriptionProvider);
+    }
+  }
+
+  @Override
+  public void setContentDescription(CharSequence contentDescription) {
+    if (contentDescriptionView != null) {
+      contentDescriptionView.setContentDescription(contentDescription);
+    } else {
+      super.setContentDescription(contentDescription);
+    }
+  }
+
+  @SuppressLint("GetContentDescriptionOverride")
+  @Override
+  public CharSequence getContentDescription() {
+    if (contentDescriptionView != null) {
+      return contentDescriptionView.getContentDescription();
+    } else {
+      return super.getContentDescription();
+    }
+  }
+
+  @NonNull
+  public View getContentDescriptionView() {
+    if (contentDescriptionView != null) {
+      return contentDescriptionView;
+    } else {
+      return this;
+    }
   }
 }

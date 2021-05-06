@@ -55,8 +55,6 @@ import com.google.android.exoplayer2.source.ads.AdsLoader;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
-import com.google.android.exoplayer2.ui.ContentDescriptionProvider;
-import com.google.android.exoplayer2.ui.ContentDescriptionViewType;
 import com.google.android.exoplayer2.ui.DebugTextViewHelper;
 import com.google.android.exoplayer2.ui.PlayerControlView;
 import com.google.android.exoplayer2.ui.PlayerView;
@@ -66,7 +64,6 @@ import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Formatter;
 import java.util.List;
 import java.util.Map;
 
@@ -154,7 +151,7 @@ public class PlayerActivity extends AppCompatActivity
       else
         playerView.announceForAccessibility(getString(R.string.announce_video_controls_hidden));
     });
-    ViewCompat.setAccessibilityDelegate(playerView, new AccessibilityDelegateCompat() {
+    ViewCompat.setAccessibilityDelegate(playerView.getContentDescriptionView(), new AccessibilityDelegateCompat() {
       @Override
       public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfoCompat info) {
         super.onInitializeAccessibilityNodeInfo(host, info);
