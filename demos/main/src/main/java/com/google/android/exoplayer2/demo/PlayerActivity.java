@@ -32,6 +32,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.AccessibilityDelegateCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.MediaItem;
@@ -145,7 +148,23 @@ public class PlayerActivity extends AppCompatActivity
     });
     playerView.setErrorMessageProvider(new PlayerErrorMessageProvider());
     playerView.requestFocus();
-
+    playerView.setControllerVisibilityListener(visibility -> {
+      if (visibility == View.VISIBLE)
+        playerView.announceForAccessibility(getString(R.string.announce_video_controls_visible));
+      else
+        playerView.announceForAccessibility(getString(R.string.announce_video_controls_hidden));
+    });
+    ViewCompat.setAccessibilityDelegate(playerView, new AccessibilityDelegateCompat() {
+      @Override
+      public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfoCompat info) {
+        super.onInitializeAccessibilityNodeInfo(host, info);
+        info.addAction(
+            new AccessibilityNodeInfoCompat.AccessibilityActionCompat(
+                AccessibilityNodeInfoCompat.ACTION_CLICK,
+                playerView.isControllerVisible() ? getString(R.string.exo_controls_hide)
+                    : getString(R.string.exo_controls_show)));
+      }
+    });
     if (savedInstanceState != null) {
       trackSelectorParameters = savedInstanceState.getParcelable(KEY_TRACK_SELECTOR_PARAMETERS);
       startAutoPlay = savedInstanceState.getBoolean(KEY_AUTO_PLAY);

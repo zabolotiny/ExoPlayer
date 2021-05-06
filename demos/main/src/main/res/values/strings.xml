@@ -62,5 +62,7 @@
   <string name="content_description_ms">%1$s %2$s %3$d min %4$d sec</string>
   <string name="view_type_progress">Time elapsed</string>
   <string name="view_type_duration">Total duration</string>
+  <string name="announce_video_controls_visible">Video controls are visible. Double tap to hide</string>
+  <string name="announce_video_controls_hidden">Video controls are hidden. Double tap to show</string>
 
 </resources>

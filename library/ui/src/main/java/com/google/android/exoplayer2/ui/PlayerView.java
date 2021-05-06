@@ -434,12 +434,12 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
     LayoutInflater.from(context).inflate(playerLayoutId, this);
     setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
-    setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+    setContentDescription(context.getString(R.string.content_description_video));
 
     // Content frame.
     contentFrame = findViewById(R.id.exo_content_frame);
     if (contentFrame != null) {
-      contentFrame.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
       setResizeModeRaw(contentFrame, resizeMode);
     }
 
@@ -1494,35 +1494,6 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   }
 
   private void updateContentDescription() {
-    if (controller == null || !useController) {
-      setContentDescription(/* contentDescription= */ null);
-    } else if (controller.getVisibility() == View.VISIBLE) {
-      setContentDescription(
-          /* contentDescription= */ controllerHideOnTouch
-              ? getResources().getString(R.string.exo_controls_hide)
-              : null);
-    } else {
-      setContentDescription(
-          /* contentDescription= */ getResources().getString(R.string.exo_controls_show));
-    }
-  }
-
-  @Override
-  public void setContentDescription(@Nullable CharSequence contentDescription) {
-    if (contentFrame != null) {
-      contentFrame.setContentDescription(contentDescription);
-    } else {
-      super.setContentDescription(contentDescription);
-    }
-  }
-
-  @Override
-  public CharSequence getContentDescription() {
-    if (contentFrame != null) {
-      return contentFrame.getContentDescription();
-    } else {
-      return super.getContentDescription();
-    }
   }
 
   private void updateControllerVisibility() {
