@@ -34,13 +34,17 @@ import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.AccessibilityDelegateCompat;
+import androidx.core.view.ViewCompat;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.DefaultControlDispatcher;
@@ -85,7 +89,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
  * file.
  *
  * <h3>Attributes</h3>
- *
+ * <p>
  * The following attributes can be set on a PlayerView when used in a layout XML file:
  *
  * <ul>
@@ -183,13 +187,13 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
  * </ul>
  *
  * <h3>Overriding drawables</h3>
- *
+ * <p>
  * The drawables used by {@link PlayerControlView} (with its default layout file) can be overridden
  * by drawables with the same names defined in your application. See the {@link PlayerControlView}
  * documentation for a list of drawables that can be overridden.
  *
  * <h3>Overriding the layout file</h3>
- *
+ * <p>
  * To customize the layout of PlayerView throughout your app, or just for certain configurations,
  * you can define {@code exo_player_view.xml} layout files in your application {@code res/layout*}
  * directories. These layouts will override the one provided by the ExoPlayer library, and will be
@@ -256,7 +260,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
  * must be of the expected type.
  *
  * <h3>Specifying a custom layout file</h3>
- *
+ * <p>
  * Defining your own {@code exo_player_view.xml} is useful to customize the layout of PlayerView
  * throughout your application. It's also possible to customize the layout for a single instance in
  * a layout file. This is achieved by setting the {@code player_layout_id} attribute on a
@@ -266,6 +270,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
 public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider {
 
   // LINT.IfChange
+
   /**
    * Determines when the buffering view is shown. One of {@link #SHOW_BUFFERING_NEVER}, {@link
    * #SHOW_BUFFERING_WHEN_PLAYING} or {@link #SHOW_BUFFERING_ALWAYS}.
@@ -273,8 +278,13 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   @Documented
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({SHOW_BUFFERING_NEVER, SHOW_BUFFERING_WHEN_PLAYING, SHOW_BUFFERING_ALWAYS})
-  public @interface ShowBuffering {}
-  /** The buffering view is never shown. */
+  public @interface ShowBuffering {
+
+  }
+
+  /**
+   * The buffering view is never shown.
+   */
   public static final int SHOW_BUFFERING_NEVER = 0;
   /**
    * The buffering view is shown when the player is in the {@link Player#STATE_BUFFERING buffering}
@@ -297,27 +307,43 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   // LINT.ThenChange(../../../../../../res/values/attrs.xml)
 
   private final ComponentListener componentListener;
-  @Nullable private final AspectRatioFrameLayout contentFrame;
-  @Nullable private final View shutterView;
-  @Nullable private final View surfaceView;
-  @Nullable private final ImageView artworkView;
-  @Nullable private final SubtitleView subtitleView;
-  @Nullable private final View bufferingView;
-  @Nullable private final TextView errorMessageView;
-  @Nullable private final PlayerControlView controller;
-  @Nullable private final FrameLayout adOverlayFrameLayout;
-  @Nullable private final FrameLayout overlayFrameLayout;
+  @Nullable
+  private final AspectRatioFrameLayout contentFrame;
+  @Nullable
+  private final View shutterView;
+  @Nullable
+  private final View surfaceView;
+  @Nullable
+  private final ImageView artworkView;
+  @Nullable
+  private final SubtitleView subtitleView;
+  @Nullable
+  private final View bufferingView;
+  @Nullable
+  private final TextView errorMessageView;
+  @Nullable
+  private final PlayerControlView controller;
+  @Nullable
+  private final FrameLayout adOverlayFrameLayout;
+  @Nullable
+  private final FrameLayout overlayFrameLayout;
 
-  @Nullable private Player player;
+  @Nullable
+  private Player player;
   private boolean useController;
-  @Nullable private PlayerControlView.VisibilityListener controllerVisibilityListener;
+  @Nullable
+  private PlayerControlView.VisibilityListener controllerVisibilityListener;
   private boolean useArtwork;
-  @Nullable private Drawable defaultArtwork;
-  private @ShowBuffering int showBuffering;
+  @Nullable
+  private Drawable defaultArtwork;
+  private @ShowBuffering
+  int showBuffering;
   private boolean keepContentOnPlayerReset;
   private boolean useSensorRotation;
-  @Nullable private ErrorMessageProvider<? super ExoPlaybackException> errorMessageProvider;
-  @Nullable private CharSequence customErrorMessage;
+  @Nullable
+  private ErrorMessageProvider<? super ExoPlaybackException> errorMessageProvider;
+  @Nullable
+  private CharSequence customErrorMessage;
   private int controllerShowTimeoutMs;
   private boolean controllerAutoShow;
   private boolean controllerHideDuringAds;
@@ -408,10 +434,12 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
     LayoutInflater.from(context).inflate(playerLayoutId, this);
     setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
+    setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
 
     // Content frame.
     contentFrame = findViewById(R.id.exo_content_frame);
     if (contentFrame != null) {
+      contentFrame.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
       setResizeModeRaw(contentFrame, resizeMode);
     }
 
@@ -515,7 +543,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
   /**
    * Switches the view targeted by a given {@link Player}.
    *
-   * @param player The player whose target view is being switched.
+   * @param player        The player whose target view is being switched.
    * @param oldPlayerView The old view to detach from the player.
    * @param newPlayerView The new view to attach to the player.
    */
@@ -536,7 +564,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  /** Returns the player currently set on this view, or null if no player is set. */
+  /**
+   * Returns the player currently set on this view, or null if no player is set.
+   */
   @Nullable
   public Player getPlayer() {
     return player;
@@ -552,8 +582,8 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * more efficient and may allow for more seamless transitions.
    *
    * @param player The {@link Player} to use, or {@code null} to detach the current player. Only
-   *     players which are accessed on the main thread are supported ({@code
-   *     player.getApplicationLooper() == Looper.getMainLooper()}).
+   *               players which are accessed on the main thread are supported ({@code
+   *               player.getApplicationLooper() == Looper.getMainLooper()}).
    */
   public void setPlayer(@Nullable Player player) {
     Assertions.checkState(Looper.myLooper() == Looper.getMainLooper());
@@ -636,13 +666,18 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     contentFrame.setResizeMode(resizeMode);
   }
 
-  /** Returns the {@link ResizeMode}. */
-  public @ResizeMode int getResizeMode() {
+  /**
+   * Returns the {@link ResizeMode}.
+   */
+  public @ResizeMode
+  int getResizeMode() {
     Assertions.checkStateNotNull(contentFrame);
     return contentFrame.getResizeMode();
   }
 
-  /** Returns whether artwork is displayed if present in the media. */
+  /**
+   * Returns whether artwork is displayed if present in the media.
+   */
   public boolean getUseArtwork() {
     return useArtwork;
   }
@@ -660,7 +695,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  /** Returns the default artwork to display. */
+  /**
+   * Returns the default artwork to display.
+   */
   @Nullable
   public Drawable getDefaultArtwork() {
     return defaultArtwork;
@@ -679,7 +716,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  /** Returns whether the playback controls can be shown. */
+  /**
+   * Returns whether the playback controls can be shown.
+   */
   public boolean getUseController() {
     return useController;
   }
@@ -733,7 +772,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * Hence the video frame will not be hidden if using a custom layout that omits this view.
    *
    * @param keepContentOnPlayerReset Whether the currently displayed video frame or media artwork is
-   *     kept visible when the player is reset.
+   *                                 kept visible when the player is reset.
    */
   public void setKeepContentOnPlayerReset(boolean keepContentOnPlayerReset) {
     if (this.keepContentOnPlayerReset != keepContentOnPlayerReset) {
@@ -747,7 +786,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * available)
    *
    * @param useSensorRotation Whether to use the orientation sensor for rotation during spherical
-   *     playbacks.
+   *                          playbacks.
    */
   public void setUseSensorRotation(boolean useSensorRotation) {
     if (this.useSensorRotation != useSensorRotation) {
@@ -763,8 +802,8 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * buffering spinner is not displayed by default.
    *
    * @param showBuffering The mode that defines when the buffering spinner is displayed. One of
-   *     {@link #SHOW_BUFFERING_NEVER}, {@link #SHOW_BUFFERING_WHEN_PLAYING} and {@link
-   *     #SHOW_BUFFERING_ALWAYS}.
+   *                      {@link #SHOW_BUFFERING_NEVER}, {@link #SHOW_BUFFERING_WHEN_PLAYING} and
+   *                      {@link #SHOW_BUFFERING_ALWAYS}.
    */
   public void setShowBuffering(@ShowBuffering int showBuffering) {
     if (this.showBuffering != showBuffering) {
@@ -833,7 +872,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     return useController() && controller.dispatchMediaKeyEvent(event);
   }
 
-  /** Returns whether the controller is currently visible. */
+  /**
+   * Returns whether the controller is currently visible.
+   */
   public boolean isControllerVisible() {
     return controller != null && controller.isVisible();
   }
@@ -849,7 +890,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     showController(shouldShowControllerIndefinitely());
   }
 
-  /** Hides the playback controls. Does nothing if playback controls are disabled. */
+  /**
+   * Hides the playback controls. Does nothing if playback controls are disabled.
+   */
   public void hideController() {
     if (controller != null) {
       controller.hide();
@@ -862,7 +905,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * progress.
    *
    * @return The timeout in milliseconds. A non-positive value will cause the controller to remain
-   *     visible indefinitely.
+   * visible indefinitely.
    */
   public int getControllerShowTimeoutMs() {
     return controllerShowTimeoutMs;
@@ -873,7 +916,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * duration of time has elapsed without user input and with playback or buffering in progress.
    *
    * @param controllerShowTimeoutMs The timeout in milliseconds. A non-positive value will cause the
-   *     controller to remain visible indefinitely.
+   *                                controller to remain visible indefinitely.
    */
   public void setControllerShowTimeoutMs(int controllerShowTimeoutMs) {
     Assertions.checkStateNotNull(controller);
@@ -884,7 +927,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
-  /** Returns whether the playback controls are hidden by touch events. */
+  /**
+   * Returns whether the playback controls are hidden by touch events.
+   */
   public boolean getControllerHideOnTouch() {
     return controllerHideOnTouch;
   }
@@ -934,7 +979,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * Set the {@link PlayerControlView.VisibilityListener}.
    *
    * @param listener The listener to be notified about visibility changes, or null to remove the
-   *     current listener.
+   *                 current listener.
    */
   public void setControllerVisibilityListener(
       @Nullable PlayerControlView.VisibilityListener listener) {
@@ -953,11 +998,10 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
   /**
    * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} instead. The view calls {@link
-   *     ControlDispatcher#dispatchPrepare(Player)} instead of {@link
-   *     PlaybackPreparer#preparePlayback()}. The {@link DefaultControlDispatcher} that the view
-   *     uses by default, calls {@link Player#prepare()}. If you wish to customize this behaviour,
-   *     you can provide a custom implementation of {@link
-   *     ControlDispatcher#dispatchPrepare(Player)}.
+   * ControlDispatcher#dispatchPrepare(Player)} instead of {@link PlaybackPreparer#preparePlayback()}.
+   * The {@link DefaultControlDispatcher} that the view uses by default, calls {@link
+   * Player#prepare()}. If you wish to customize this behaviour, you can provide a custom
+   * implementation of {@link ControlDispatcher#dispatchPrepare(Player)}.
    */
   @SuppressWarnings("deprecation")
   @Deprecated
@@ -1018,7 +1062,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
   /**
    * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} with {@link
-   *     DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
+   * DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
    */
   @SuppressWarnings("deprecation")
   @Deprecated
@@ -1029,7 +1073,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
   /**
    * @deprecated Use {@link #setControlDispatcher(ControlDispatcher)} with {@link
-   *     DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
+   * DefaultControlDispatcher#DefaultControlDispatcher(long, long)}.
    */
   @SuppressWarnings("deprecation")
   @Deprecated
@@ -1074,9 +1118,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * markers are shown in addition to any ad markers for ads in the player's timeline.
    *
    * @param extraAdGroupTimesMs The millisecond timestamps of the extra ad markers to show, or
-   *     {@code null} to show no extra ad markers.
+   *                            {@code null} to show no extra ad markers.
    * @param extraPlayedAdGroups Whether each ad has been played, or {@code null} to show no extra ad
-   *     markers.
+   *                            markers.
    */
   public void setExtraAdGroupMarkers(
       @Nullable long[] extraAdGroupTimesMs, @Nullable boolean[] extraPlayedAdGroups) {
@@ -1088,7 +1132,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * Set the {@link AspectRatioFrameLayout.AspectRatioListener}.
    *
    * @param listener The listener to be notified about aspect ratios changes of the video content or
-   *     the content frame.
+   *                 the content frame.
    */
   public void setAspectRatioListener(
       @Nullable AspectRatioFrameLayout.AspectRatioListener listener) {
@@ -1111,7 +1155,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * </ul>
    *
    * @return The {@link SurfaceView}, {@link TextureView}, {@link SphericalGLSurfaceView}, {@link
-   *     VideoDecoderGLSurfaceView} or {@code null}.
+   * VideoDecoderGLSurfaceView} or {@code null}.
    */
   @Nullable
   public View getVideoSurfaceView() {
@@ -1123,7 +1167,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * the player.
    *
    * @return The overlay {@link FrameLayout}, or {@code null} if the layout has been customized and
-   *     the overlay is not present.
+   * the overlay is not present.
    */
   @Nullable
   public FrameLayout getOverlayFrameLayout() {
@@ -1134,7 +1178,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * Gets the {@link SubtitleView}.
    *
    * @return The {@link SubtitleView}, or {@code null} if the layout has been customized and the
-   *     subtitle view is not present.
+   * subtitle view is not present.
    */
   @Nullable
   public SubtitleView getSubtitleView() {
@@ -1210,8 +1254,8 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
    * cleared.
    *
    * @param contentAspectRatio The aspect ratio of the content.
-   * @param contentFrame The content frame, or {@code null}.
-   * @param contentView The view that holds the content being displayed, or {@code null}.
+   * @param contentFrame       The content frame, or {@code null}.
+   * @param contentView        The view that holds the content being displayed, or {@code null}.
    */
   protected void onContentAspectRatioChanged(
       float contentAspectRatio,
@@ -1280,7 +1324,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     return true;
   }
 
-  /** Shows the playback controls, but only if forced or shown indefinitely. */
+  /**
+   * Shows the playback controls, but only if forced or shown indefinitely.
+   */
   private void maybeShowController(boolean isForced) {
     if (isPlayingAd() && controllerHideDuringAds) {
       return;
@@ -1301,8 +1347,8 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     int playbackState = player.getPlaybackState();
     return controllerAutoShow
         && (playbackState == Player.STATE_IDLE
-            || playbackState == Player.STATE_ENDED
-            || !player.getPlayWhenReady());
+        || playbackState == Player.STATE_ENDED
+        || !player.getPlayWhenReady());
   }
 
   private void showController(boolean showIndefinitely) {
@@ -1424,7 +1470,7 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
           player != null
               && player.getPlaybackState() == Player.STATE_BUFFERING
               && (showBuffering == SHOW_BUFFERING_ALWAYS
-                  || (showBuffering == SHOW_BUFFERING_WHEN_PLAYING && player.getPlayWhenReady()));
+              || (showBuffering == SHOW_BUFFERING_WHEN_PLAYING && player.getPlayWhenReady()));
       bufferingView.setVisibility(showBufferingSpinner ? View.VISIBLE : View.GONE);
     }
   }
@@ -1461,6 +1507,24 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     }
   }
 
+  @Override
+  public void setContentDescription(@Nullable CharSequence contentDescription) {
+    if (contentFrame != null) {
+      contentFrame.setContentDescription(contentDescription);
+    } else {
+      super.setContentDescription(contentDescription);
+    }
+  }
+
+  @Override
+  public CharSequence getContentDescription() {
+    if (contentFrame != null) {
+      return contentFrame.getContentDescription();
+    } else {
+      return super.getContentDescription();
+    }
+  }
+
   private void updateControllerVisibility() {
     if (isPlayingAd() && controllerHideDuringAds) {
       hideController();
@@ -1485,7 +1549,9 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     aspectRatioFrame.setResizeMode(resizeMode);
   }
 
-  /** Applies a texture rotation to a {@link TextureView}. */
+  /**
+   * Applies a texture rotation to a {@link TextureView}.
+   */
   private static void applyTextureViewRotation(TextureView textureView, int textureViewRotation) {
     Matrix transformMatrix = new Matrix();
     float textureViewWidth = textureView.getWidth();
@@ -1523,14 +1589,15 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
 
   private final class ComponentListener
       implements Player.EventListener,
-          TextOutput,
-          VideoListener,
-          OnLayoutChangeListener,
-          SingleTapListener,
-          PlayerControlView.VisibilityListener {
+      TextOutput,
+      VideoListener,
+      OnLayoutChangeListener,
+      SingleTapListener,
+      PlayerControlView.VisibilityListener {
 
     private final Period period;
-    private @Nullable Object lastPeriodUidWithTracks;
+    private @Nullable
+    Object lastPeriodUidWithTracks;
 
     public ComponentListener() {
       period = new Period();
@@ -1662,5 +1729,56 @@ public class PlayerView extends FrameLayout implements AdsLoader.AdViewProvider 
     public void onVisibilityChange(int visibility) {
       updateContentDescription();
     }
+  }
+
+  @Override
+  public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
+      super.onInitializeAccessibilityEvent(event);
+  }
+
+  @Override
+  public boolean onRequestSendAccessibilityEvent(View child, AccessibilityEvent event) {
+    if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+      return super.onRequestSendAccessibilityEvent(child, event);
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public void addView(View child, int index, ViewGroup.LayoutParams params) {
+    super.addView(child, index, params);
+    setAccessibilityDelegate();
+  }
+
+  private void setAccessibilityDelegate() {
+    if (controller==null)
+      return;
+    setAccessibilityDelegate(controller);
+  }
+
+  private final AccessibilityDelegateCompat accessibilityDelegateCompat = new AccessibilityDelegateCompat(){
+    @Override
+    public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
+      super.onInitializeAccessibilityEvent(host, event);
+      if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SELECTED || event.getEventType() == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED){
+        showController();
+      }
+    }
+  };
+
+  private void setAccessibilityDelegate(View view) {
+    if (view instanceof ViewGroup) {
+      for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
+        setAccessibilityDelegate(((ViewGroup) view).getChildAt(i));
+      }
+    } else {
+      ViewCompat.setAccessibilityDelegate(view, accessibilityDelegateCompat);
+    }
+  }
+
+  public void setContentDescriptionProvider(@NonNull  ContentDescriptionProvider contentDescriptionProvider){
+    if (controller!=null)
+      controller.setContentDescriptionProvider(contentDescriptionProvider);
   }
 }

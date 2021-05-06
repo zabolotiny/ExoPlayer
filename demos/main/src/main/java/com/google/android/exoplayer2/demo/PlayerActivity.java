@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.demo;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
+import static java.lang.Math.abs;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -51,21 +52,26 @@ import com.google.android.exoplayer2.source.ads.AdsLoader;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
+import com.google.android.exoplayer2.ui.ContentDescriptionProvider;
+import com.google.android.exoplayer2.ui.ContentDescriptionViewType;
 import com.google.android.exoplayer2.ui.DebugTextViewHelper;
-import com.google.android.exoplayer2.ui.StyledPlayerControlView;
-import com.google.android.exoplayer2.ui.StyledPlayerView;
+import com.google.android.exoplayer2.ui.PlayerControlView;
+import com.google.android.exoplayer2.ui.PlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.util.ErrorMessageProvider;
 import com.google.android.exoplayer2.util.EventLogger;
 import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Formatter;
 import java.util.List;
 import java.util.Map;
 
-/** An activity that plays media using {@link SimpleExoPlayer}. */
+/**
+ * An activity that plays media using {@link SimpleExoPlayer}.
+ */
 public class PlayerActivity extends AppCompatActivity
-    implements OnClickListener, StyledPlayerControlView.VisibilityListener {
+    implements OnClickListener, PlayerControlView.VisibilityListener {
 
   // Saved instance state keys.
 
@@ -74,7 +80,7 @@ public class PlayerActivity extends AppCompatActivity
   private static final String KEY_POSITION = "position";
   private static final String KEY_AUTO_PLAY = "auto_play";
 
-  protected StyledPlayerView playerView;
+  protected PlayerView playerView;
   protected LinearLayout debugRootView;
   protected TextView debugTextView;
   protected SimpleExoPlayer player;
@@ -110,6 +116,33 @@ public class PlayerActivity extends AppCompatActivity
 
     playerView = findViewById(R.id.player_view);
     playerView.setControllerVisibilityListener(this);
+    playerView.setContentDescriptionProvider((viewType, builder, formatter, timeMs) -> {
+      if (timeMs == C.TIME_UNSET) {
+        timeMs = 0;
+      }
+      String prefix = timeMs < 0 ? "-" : "";
+      timeMs = abs(timeMs);
+      long totalSeconds = (timeMs + 500) / 1000;
+      long seconds = totalSeconds % 60;
+      long minutes = (totalSeconds / 60) % 60;
+      long hours = totalSeconds / 3600;
+      builder.setLength(0);
+      String type;
+      switch (viewType) {
+        case PROGRESS:
+          type = getString(R.string.view_type_progress);
+          break;
+        case DURATION:
+          type = getString(R.string.view_type_duration);
+          break;
+        default:
+          type = "";
+      }
+      return hours > 0
+          ? getString(R.string.content_description_hms, type, prefix, hours, minutes, seconds)
+          : getString(R.string.content_description_ms, type, prefix, minutes, seconds);
+
+    });
     playerView.setErrorMessageProvider(new PlayerErrorMessageProvider());
     playerView.requestFocus();
 
@@ -250,7 +283,9 @@ public class PlayerActivity extends AppCompatActivity
     setContentView(R.layout.player_activity);
   }
 
-  /** @return Whether initialization was successful. */
+  /**
+   * @return Whether initialization was successful.
+   */
   protected boolean initializePlayer() {
     if (player == null) {
       Intent intent = getIntent();

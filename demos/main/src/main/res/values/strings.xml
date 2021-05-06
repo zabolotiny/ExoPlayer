@@ -58,5 +58,9 @@
   <string name="download_ads_unsupported">IMA does not support offline ads</string>
 
   <string name="prefer_extension_decoders">Prefer extension decoders</string>
+  <string name="content_description_hms">%1$s %2$s %3$d hr %4$d min %5$d sec</string>
+  <string name="content_description_ms">%1$s %2$s %3$d min %4$d sec</string>
+  <string name="view_type_progress">Time elapsed</string>
+  <string name="view_type_duration">Total duration</string>
 
 </resources>

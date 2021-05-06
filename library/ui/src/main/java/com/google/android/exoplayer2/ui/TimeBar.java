@@ -16,6 +16,7 @@
 package com.google.android.exoplayer2.ui;
 
 import android.view.View;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
@@ -104,6 +105,8 @@ public interface TimeBar {
    */
   void setAdGroupTimesMs(@Nullable long[] adGroupTimesMs, @Nullable boolean[] playedAdGroups,
       int adGroupCount);
+
+  void setContentDescriptionProvider(@NonNull ContentDescriptionProvider contentDescriptionProvider);
 
   /**
    * Listener for scrubbing events.

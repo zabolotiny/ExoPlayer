@@ -39,6 +39,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ControlDispatcher;
@@ -347,6 +348,9 @@ public class PlayerControlView extends FrameLayout {
   private boolean[] extraPlayedAdGroups;
   private long currentWindowOffset;
 
+  @NonNull
+  private ContentDescriptionProvider contentDescriptionProvider = new DefaultContentDescriptionProvider();
+
   public PlayerControlView(Context context) {
     this(context, /* attrs= */ null);
   }
@@ -455,6 +459,7 @@ public class PlayerControlView extends FrameLayout {
 
     if (timeBar != null) {
       timeBar.addListener(componentListener);
+      timeBar.setContentDescriptionProvider(this.contentDescriptionProvider);
     }
     playButton = findViewById(R.id.exo_play);
     if (playButton != null) {
@@ -1045,6 +1050,10 @@ public class PlayerControlView extends FrameLayout {
     long durationMs = C.usToMs(durationUs);
     if (durationView != null) {
       durationView.setText(Util.getStringForTime(formatBuilder, formatter, durationMs));
+      durationView.setContentDescription(contentDescriptionProvider
+          .provideContentDescription(ContentDescriptionViewType.DURATION, formatBuilder, formatter,
+              durationMs));
+
     }
     if (timeBar != null) {
       timeBar.setDuration(durationMs);
@@ -1075,6 +1084,9 @@ public class PlayerControlView extends FrameLayout {
     }
     if (positionView != null && !scrubbing) {
       positionView.setText(Util.getStringForTime(formatBuilder, formatter, position));
+      positionView.setContentDescription(contentDescriptionProvider
+          .provideContentDescription(ContentDescriptionViewType.PROGRESS, formatBuilder, formatter,
+              position));
     }
     if (timeBar != null) {
       timeBar.setPosition(position);
@@ -1326,6 +1338,9 @@ public class PlayerControlView extends FrameLayout {
       scrubbing = true;
       if (positionView != null) {
         positionView.setText(Util.getStringForTime(formatBuilder, formatter, position));
+        positionView.setContentDescription(contentDescriptionProvider
+            .provideContentDescription(ContentDescriptionViewType.PROGRESS, formatBuilder, formatter,
+                position));
       }
     }
 
@@ -1333,6 +1348,9 @@ public class PlayerControlView extends FrameLayout {
     public void onScrubMove(TimeBar timeBar, long position) {
       if (positionView != null) {
         positionView.setText(Util.getStringForTime(formatBuilder, formatter, position));
+        positionView.setContentDescription(contentDescriptionProvider
+            .provideContentDescription(ContentDescriptionViewType.PROGRESS, formatBuilder, formatter,
+                position));
       }
     }
 
@@ -1397,6 +1415,14 @@ public class PlayerControlView extends FrameLayout {
       } else if (shuffleButton == view) {
         controlDispatcher.dispatchSetShuffleModeEnabled(player, !player.getShuffleModeEnabled());
       }
+    }
+  }
+
+  public void setContentDescriptionProvider(
+      @NonNull ContentDescriptionProvider contentDescriptionProvider) {
+    this.contentDescriptionProvider = contentDescriptionProvider;
+    if (timeBar != null) {
+      timeBar.setContentDescriptionProvider(this.contentDescriptionProvider);
     }
   }
 }

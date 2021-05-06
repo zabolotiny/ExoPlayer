@@ -35,6 +35,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 import androidx.annotation.ColorInt;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import com.google.android.exoplayer2.C;
@@ -223,6 +224,9 @@ public class DefaultTimeBar extends View implements TimeBar {
   private int adGroupCount;
   @Nullable private long[] adGroupTimesMs;
   @Nullable private boolean[] playedAdGroups;
+
+  @NonNull
+  private ContentDescriptionProvider contentDescriptionProvider = new DefaultContentDescriptionProvider();
 
   public DefaultTimeBar(Context context) {
     this(context, null);
@@ -719,22 +723,22 @@ public class DefaultTimeBar extends View implements TimeBar {
     event.setClassName(ACCESSIBILITY_CLASS_NAME);
   }
 
-//  @Override
-//  public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
-//    super.onInitializeAccessibilityNodeInfo(info);
-//    info.setClassName(ACCESSIBILITY_CLASS_NAME);
-//    info.setContentDescription(getProgressText());
-//    if (duration <= 0) {
-//      return;
-//    }
-//    if (Util.SDK_INT >= 21) {
-//      info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);
-//      info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD);
-//    } else {
-//      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-//      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
-//    }
-//  }
+  @Override
+  public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+    super.onInitializeAccessibilityNodeInfo(info);
+    info.setClassName(ACCESSIBILITY_CLASS_NAME);
+    info.setContentDescription(getProgressText());
+    if (duration <= 0) {
+      return;
+    }
+    if (Util.SDK_INT >= 21) {
+      info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);
+      info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD);
+    } else {
+      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+      info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
+    }
+  }
 
   @Override
   public boolean performAccessibilityAction(int action, @Nullable Bundle args) {
@@ -755,7 +759,7 @@ public class DefaultTimeBar extends View implements TimeBar {
     } else {
       return false;
     }
-    sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
+    //sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_SELECTED);
     return true;
   }
 
@@ -939,7 +943,8 @@ public class DefaultTimeBar extends View implements TimeBar {
   }
 
   private String getProgressText() {
-    return Util.getStringForTime(formatBuilder, formatter, position);
+    return contentDescriptionProvider
+        .provideContentDescription(ContentDescriptionViewType.PROGRESS, formatBuilder, formatter, position).toString();
   }
 
   private long getPositionIncrement() {
@@ -961,5 +966,12 @@ public class DefaultTimeBar extends View implements TimeBar {
 
   private static int pxToDp(float density, int px) {
     return (int) (px / density);
+  }
+
+  @Override
+  public void setContentDescriptionProvider(
+      @NonNull
+          ContentDescriptionProvider contentDescriptionProvider) {
+    this.contentDescriptionProvider = contentDescriptionProvider;
   }
 }

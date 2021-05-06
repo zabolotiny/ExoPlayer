@@ -71,6 +71,10 @@
       android:layout_height="wrap_content"
       android:textSize="14sp"
       android:textStyle="bold"
+      android:focusableInTouchMode="true"
+      android:focusable="true"
+      android:importantForAccessibility="yes"
+      android:screenReaderFocusable="true"
       android:paddingLeft="4dp"
       android:paddingRight="4dp"
       android:includeFontPadding="false"
@@ -87,6 +91,7 @@
       android:textSize="14sp"
       android:textStyle="bold"
       android:paddingLeft="4dp"
+      android:screenReaderFocusable="true"
       android:paddingRight="4dp"
       android:includeFontPadding="false"
       android:textColor="#FFBEBEBE"/>
